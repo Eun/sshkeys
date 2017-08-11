@@ -2,11 +2,12 @@ package sshkeys
 
 import (
 	"net"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
 
-func GetKeys(host string) ([]ssh.PublicKey, error) {
+func GetKeys(host string, timeout time.Duration) ([]ssh.PublicKey, error) {
 	// from ssh.supportedHostKeyAlgos
 	supportedHostKeyAlgos := []string{
 		ssh.CertAlgoRSAv01, ssh.CertAlgoDSAv01, ssh.CertAlgoECDSA256v01,
@@ -19,7 +20,7 @@ func GetKeys(host string) ([]ssh.PublicKey, error) {
 	var keys []ssh.PublicKey
 
 	for _, algo := range supportedHostKeyAlgos {
-		key, err := getPublicKey(host, algo)
+		key, err := getPublicKey(host, algo, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -30,8 +31,8 @@ func GetKeys(host string) ([]ssh.PublicKey, error) {
 	return keys, nil
 }
 
-func getPublicKey(host, algo string) (key ssh.PublicKey, err error) {
-	d := net.Dialer{}
+func getPublicKey(host, algo string, timeout time.Duration) (key ssh.PublicKey, err error) {
+	d := net.Dialer{Timeout: timeout}
 	conn, err := d.Dial("tcp", host)
 	if err != nil {
 		return nil, err

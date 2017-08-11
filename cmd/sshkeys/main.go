@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/asaskevich/govalidator"
 
@@ -19,6 +20,7 @@ import (
 
 var formatOption string
 var outputOption string
+var timeoutOption string
 
 const (
 	authorized_keys = 1
@@ -33,9 +35,11 @@ const (
 
 func init() {
 	flag.StringVar(&formatOption, "format", "authorized_keys", "")
-	flag.StringVar(&outputOption, "output", "", "")
 	flag.StringVar(&formatOption, "f", "authorized_keys", "")
+	flag.StringVar(&outputOption, "output", "", "")
 	flag.StringVar(&outputOption, "o", "", "")
+	flag.StringVar(&timeoutOption, "timeout", "60s", "")
+	flag.StringVar(&timeoutOption, "t", "60s", "")
 
 }
 
@@ -44,8 +48,9 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Options:")
 	fmt.Fprintln(os.Stderr, "    -format=authorized_keys       Format to print the public keys, valid formats are: fingerprint, fingerprint-sha1, sha1, fingerprint-legacy, fingerprint-md5, md5, authorized_keys, authorizedkeys, authorized")
 	fmt.Fprintln(os.Stderr, "    -output=console               Output format, valid formats are: console, json")
+	fmt.Fprintln(os.Stderr, "    -timeout=60s                  Connection timeout")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "sshkeys 1.1 https://github.com/Eun/sshkeys")
+	fmt.Fprintln(os.Stderr, "sshkeys 1.11 https://github.com/Eun/sshkeys")
 }
 
 func main() {
@@ -62,6 +67,12 @@ func main() {
 
 	format := parseFormat(formatOption)
 	output := parseOutput(outputOption)
+
+	timeout, err := time.ParseDuration(timeoutOption)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "'%s' is not a duration\n", timeoutOption)
+		os.Exit(1)
+	}
 
 	internalHost := host
 
@@ -82,7 +93,7 @@ func main() {
 		internalHost += ":22"
 	}
 
-	keys, err := sshkeys.GetKeys(internalHost)
+	keys, err := sshkeys.GetKeys(internalHost, timeout)
 
 	if err != nil {
 		switch output {

@@ -50,7 +50,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "    -output=console               Output format, valid formats are: console, json")
 	fmt.Fprintln(os.Stderr, "    -timeout=60s                  Connection timeout")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "sshkeys 1.11 https://github.com/Eun/sshkeys")
+	fmt.Fprintln(os.Stderr, "sshkeys 1.12 https://github.com/Eun/sshkeys")
 }
 
 func main() {

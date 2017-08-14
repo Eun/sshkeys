@@ -2,6 +2,7 @@ package sshkeys
 
 import (
 	"net"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -17,18 +18,60 @@ func GetKeys(host string, timeout time.Duration) ([]ssh.PublicKey, error) {
 		ssh.KeyAlgoED25519,
 	}
 
-	var keys []ssh.PublicKey
+	type result struct {
+		Key   ssh.PublicKey
+		Error error
+	}
+
+	var wg sync.WaitGroup
+
+	results := make(chan result, len(supportedHostKeyAlgos))
 
 	for _, algo := range supportedHostKeyAlgos {
-		key, err := getPublicKey(host, algo, timeout)
-		if err != nil {
-			return nil, err
+		wg.Add(1)
+		go func(algo string) {
+			defer wg.Done()
+			key, err := getPublicKey(host, algo, timeout)
+			results <- result{key, err}
+		}(algo)
+	}
+	wg.Wait()
+
+	var keys []ssh.PublicKey
+	for range supportedHostKeyAlgos {
+		result := <-results
+		if result.Error != nil {
+			return nil, result.Error
 		}
-		if key != nil {
-			keys = append(keys, key)
+		if result.Key != nil {
+			keys = append(keys, result.Key)
 		}
 	}
 	return keys, nil
+}
+
+func GetVersion(host string, timeout time.Duration) (string, error) {
+	d := net.Dialer{Timeout: timeout}
+	conn, err := d.Dial("tcp", host)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	bytes := make([]byte, 255)
+	n, err := conn.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	for i := 0; i < n; i++ {
+		if bytes[i] < 32 {
+			return string(bytes[:i]), nil
+		}
+	}
+
+	return "unknown", nil
+
 }
 
 func getPublicKey(host, algo string, timeout time.Duration) (key ssh.PublicKey, err error) {

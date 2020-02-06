@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,7 +91,7 @@ func main() {
 			}
 			os.Exit(1)
 		}
-		internalHost += ":22"
+		internalHost = net.JoinHostPort(internalHost, "22")
 	}
 
 	keys, err := sshkeys.GetKeys(internalHost, timeout)

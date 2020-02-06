@@ -1,0 +1,70 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+builds:
+  -
+    main: ./cmd/sshkeys/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - aix
+      - darwin
+      - dragonfly
+      - freebsd
+      - linux
+      - netbsd
+      - openbsd
+      - plan9
+      - solaris
+      - windows
+    goarch:
+      - 386
+      - arm
+      - arm64
+      - amd64
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    replacements:
+      darwin: darwin
+      linux: linux
+      windows: windows
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+nfpms:
+  -
+    id: minigo
+    package_name: minigo
+
+    replacements:
+      amd64: 64-bit
+      386: 32-bit
+      darwin: macOS
+      linux: linux
+
+    homepage: https://github.com/Eun/sshkeys
+    maintainer: Tobias Salzmann <eun@su.am>
+    description: Get all ssh public keys of a ssh server
+
+    license: MIT
+
+    # Formats to be generated.
+    formats:
+      - deb
+      - rpm
+
+    # Package epoch.
+    # Defaults to empty.
+    epoch: 1
+

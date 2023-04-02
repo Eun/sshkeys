@@ -2,8 +2,8 @@ package sshkeys
 
 import (
 	"context"
-	"crypto/md5"
-	"crypto/sha1"
+	"crypto/md5"  //nolint: gosec // allow weak cryptographic primitive
+	"crypto/sha1" //nolint: gosec // allow weak cryptographic primitive
 	"crypto/sha256"
 	"errors"
 	"fmt"

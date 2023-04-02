@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/md5"  //nolint: gosec // allow weak cryptographic primitive
-	"crypto/sha1" //nolint: gosec // allow weak cryptographic primitive
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -30,9 +28,10 @@ var commit string
 var date string
 
 const (
-	authorizedKeys  = 1
-	fingerprintMD5  = 2
-	fingerprintSHA1 = 3
+	authorizedKeys    = 1
+	fingerprintMD5    = 2
+	fingerprintSHA1   = 3
+	fingerprintSHA256 = 4
 )
 
 const (
@@ -56,7 +55,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Options:")
 	fmt.Fprintln(os.Stderr, "    -format=authorized_keys       "+
 		"Format to print the public keys, valid formats are: fingerprint, "+""+
-		"fingerprint-sha1, sha1, fingerprint-legacy, fingerprint-md5, md5, authorized_keys, authorizedkeys, authorized")
+		"sha1, sha256, md5, authorized_keys")
 	fmt.Fprintln(os.Stderr, "    -output=console               Output format, valid formats are: console, json")
 	fmt.Fprintln(os.Stderr, "    -timeout=60s                  Connection timeout")
 	fmt.Fprintln(os.Stderr, "    -concurrent=4                 Concurrent workers")
@@ -105,7 +104,11 @@ func main() {
 
 	printableKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
-		printableKey := keyToString(key, format)
+		printableKey, marshalErr := keyToString(key, format)
+		if marshalErr != nil {
+			exitWithMessage(output, host, marshalErr.Error())
+			return
+		}
 		addToResult := true
 		for _, k := range printableKeys {
 			if k == printableKey {
@@ -155,39 +158,31 @@ func exitWithMessage(output int, host, s string) {
 	os.Exit(1)
 }
 
-func sumToString(sum []byte) (s string) {
-	for i := 0; i < len(sum); i++ {
-		s += fmt.Sprintf("%02x", sum[i])
-		if i < len(sum)-1 {
-			s += ":"
-		}
-	}
-	return s
-}
-
-func keyToString(key ssh.PublicKey, format int) string {
+func keyToString(key ssh.PublicKey, format int) (string, error) {
 	switch format {
 	case fingerprintMD5:
-		sum := md5.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
-		return sumToString(sum[:])
+		return sshkeys.FingerprintMD5(key)
 	case fingerprintSHA1:
-		sum := sha1.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
-		return sumToString(sum[:])
+		return sshkeys.FingerprintSHA1(key)
+	case fingerprintSHA256:
+		return sshkeys.FingerprintSHA256(key)
 	// case authorized_keys:
 	//	fallthrough
 	default:
-		return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key)))
+		return sshkeys.AuthorizedKey(key)
 	}
 }
 
 func parseFormat(format string) int {
 	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "fingerprint", "sha1", "fingerprint-sha1":
-		return fingerprintSHA1
-	case "fingerprint-legacy", "md5", "fingerprint-md5":
+	case "md5":
 		return fingerprintMD5
-	case "authorized_keys", "authorizedkeys", "authorized", "4716", "rfc-4716", "rfc4716":
-		return authorizedKeys
+	case "sha1":
+		return fingerprintSHA1
+	case "sha256":
+		return fingerprintSHA256
+	// case "authorized_keys":
+	//	return authorizedKeys
 	default:
 		return authorizedKeys
 	}

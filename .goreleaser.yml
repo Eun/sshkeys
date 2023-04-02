@@ -2,6 +2,7 @@ project_name: "${ProjectName}"
 builds:
   -
     binary: "${ProjectName}"
+    main: "./cmd/${ProjectName}"
     env:
       - "CGO_ENABLED=0"
     goos:

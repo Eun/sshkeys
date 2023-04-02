@@ -2,7 +2,11 @@ package sshkeys
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -200,4 +204,38 @@ func GetVersion(ctx context.Context, host string) (string, error) {
 	case r := <-ch:
 		return r.version, r.err
 	}
+}
+
+func sumToString(sum []byte) string {
+	var sb strings.Builder
+	for i := 0; i < len(sum); i++ {
+		fmt.Fprintf(&sb, "%02x", sum[i])
+		if i < len(sum)-1 {
+			sb.WriteRune(':')
+		}
+	}
+	return sb.String()
+}
+
+// FingerprintMD5 creates the md5 fingerprint of the provided public key.
+func FingerprintMD5(key ssh.PublicKey) (string, error) {
+	sum := md5.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
+	return sumToString(sum[:]), nil
+}
+
+// FingerprintSHA1 creates the sha1 fingerprint of the provided public key.
+func FingerprintSHA1(key ssh.PublicKey) (string, error) {
+	sum := sha1.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
+	return sumToString(sum[:]), nil
+}
+
+// FingerprintSHA256 creates the sha256 fingerprint of the provided public key.
+func FingerprintSHA256(key ssh.PublicKey) (string, error) {
+	sum := sha256.Sum256(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
+	return sumToString(sum[:]), nil
+}
+
+// AuthorizedKey creates the authorized_key of the provided public key.
+func AuthorizedKey(key ssh.PublicKey) (string, error) {
+	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))), nil
 }

@@ -231,7 +231,7 @@ func FingerprintSHA1(key ssh.PublicKey) (string, error) {
 
 // FingerprintSHA256 creates the sha256 fingerprint of the provided public key.
 func FingerprintSHA256(key ssh.PublicKey) (string, error) {
-	sum := sha256.Sum256(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
+	sum := sha256.Sum256(key.Marshal())
 	return sumToString(sum[:]), nil
 }
 

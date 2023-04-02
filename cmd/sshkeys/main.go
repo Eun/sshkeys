@@ -104,9 +104,9 @@ func main() {
 
 	printableKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
-		printableKey, err := keyToString(key, format)
-		if err != nil {
-			exitWithMessage(output, host, err.Error())
+		printableKey, marshalErr := keyToString(key, format)
+		if marshalErr != nil {
+			exitWithMessage(output, host, marshalErr.Error())
 			return
 		}
 		addToResult := true

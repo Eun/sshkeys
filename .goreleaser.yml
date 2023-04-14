@@ -24,11 +24,11 @@ builds:
     ldflags:
       - -s
       - -w
-      - -X "${GoPackageName}/cmd/root.version={{.Version}}"
-      - -X "${GoPackageName}/cmd/root.commit={{.Commit}}"
-      - -X "${GoPackageName}/cmd/root.date={{.Date}}"
-      - -X "${GoPackageName}/cmd/root.author=${Author}"
-      - -X "${GoPackageName}/cmd/root.description=${Description}"
+      - -X "main.version={{.Version}}"
+      - -X "main.commit={{.Commit}}"
+      - -X "main.date={{.Date}}"
+      - -X "main.author=${Author}"
+      - -X "main.description=${Description}"
 archives:
   - name_template: "${ProjectName}_{{.Version}}_{{.Os}}_{{.Arch}}{{if .Arm}}v{{.Arm}}{{end}}"
     replacements:

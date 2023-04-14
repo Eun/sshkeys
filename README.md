@@ -6,29 +6,51 @@
 ---
 Get all ssh public keys of an ssh server.
 
-### Installation
+## Installation
 
-    go install github.com/Eun/sshkeys/cmd/sshkeys
+### Docker
+```shell
+$ docker run --rm -ti ghcr.io/eun/sshkeys:latest -algorithm=sha256 -encoding=base64 github.com
+```
 
-OR
+### Prebuild
+Download in the [Releases](https://github.com/Eun/sshkeys/releases) section.
 
-Prebuild from [Releases](https://github.com/Eun/sshkeys/releases)
+### go
+```shell
+$ go install github.com/Eun/sshkeys/cmd/sshkeys
+```
 
-### Usage
+## Usage
+```shell
+Usage: sshkeys [options] <host>
+Options:
+    -a authorized_keys
+    -algorithm=authorized_keys
+       Algorithm to hash the public keys, valid algorithms are: sha1, sha256, md5, authorized_keys
 
-    sshkeys [options] host
+    -e=
+    -encoding=
+       Encoding to encode the hashed keys, valid encodings are: hex, base32, base64 (only used for algorithms sha1, sha256 and md5)
 
-    Options:
-        -format=authorized_keys       Format to print the public keys, valid formats are: fingerprint, fingerprint-sha1, sha1, fingerprint-legacy, fingerprint-md5, md5, authorized_keys, authorizedkeys, authorized
-	    -output=console               Output format, valid formats are: console, json
-        -timeout=60s                  Connection timeout
-        -concurrent=4                 Concurrent workers
+    -o=console
+    -output=console
+       Output format, valid formats are: console, json
 
-### Example
+    -c=4
+    -concurrent=4
+       Concurrent workers
 
-    sshkeys example.com
-    sshkeys -format=fingerprint-md5 -output=json example.com:22
+    -t=60s
+    -timeout=60s
+       Connection timeout
+```
 
+### Examples
+```shell
+$ sshkeys example.com
+$ sshkeys -algorithm=sha256 -encoding=base64 -output=json github.com:22
+```
 
 ## Build History
 [![Build history](https://buildstats.info/github/chart/Eun/sshkeys?branch=master)](https://github.com/Eun/go-bin-template/actions)

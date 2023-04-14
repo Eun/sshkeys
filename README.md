@@ -10,7 +10,7 @@ Get all ssh public keys of an ssh server.
 
 ### Docker
 ```shell
-docker run --rm -ti ghcr.io/eun/sshkeys:latest -algorithm=sha256 -encoding=base64 github.com
+$ docker run --rm -ti ghcr.io/eun/sshkeys:latest -algorithm=sha256 -encoding=base64 github.com
 ```
 
 ### Prebuild
@@ -18,7 +18,7 @@ Download in the [Releases](https://github.com/Eun/sshkeys/releases) section.
 
 ### go
 ```shell
-go install github.com/Eun/sshkeys/cmd/sshkeys
+$ go install github.com/Eun/sshkeys/cmd/sshkeys
 ```
 
 ## Usage
@@ -46,10 +46,10 @@ Options:
        Connection timeout
 ```
 
-### Example
+### Examples
 ```shell
 $ sshkeys example.com
-$ sshkeys -algorithm=sha256 -encoding=base64 -output=json example.com:22
+$ sshkeys -algorithm=sha256 -encoding=base64 -output=json github.com:22
 ```
 
 ## Build History

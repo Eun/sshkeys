@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -17,7 +18,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var formatOption string
+var algorithmOption string
+var encodingOption string
 var outputOption string
 var timeoutOption string
 var concurrentOption int
@@ -27,11 +29,13 @@ var version string
 var commit string
 var date string
 
+type fingerPrintAlgo uint8
+
 const (
-	authorizedKeys    = 1
-	fingerprintMD5    = 2
-	fingerprintSHA1   = 3
-	fingerprintSHA256 = 4
+	authorizedKeys fingerPrintAlgo = iota
+	fingerprintMD5
+	fingerprintSHA1
+	fingerprintSHA256
 )
 
 const (
@@ -40,8 +44,10 @@ const (
 )
 
 func setupFlags() {
-	flag.StringVar(&formatOption, "format", "authorized_keys", "")
-	flag.StringVar(&formatOption, "f", "authorized_keys", "")
+	flag.StringVar(&algorithmOption, "algorithm", "authorized_keys", "")
+	flag.StringVar(&algorithmOption, "a", "authorized_keys", "")
+	flag.StringVar(&encodingOption, "encoding", "", "")
+	flag.StringVar(&encodingOption, "e", "", "")
 	flag.StringVar(&outputOption, "output", "", "")
 	flag.StringVar(&outputOption, "o", "", "")
 	flag.StringVar(&timeoutOption, "timeout", "60s", "")
@@ -53,61 +59,84 @@ func setupFlags() {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s [options] <host>\n", filepath.Base(os.Args[0]))
 	fmt.Fprintln(os.Stderr, "Options:")
-	fmt.Fprintln(os.Stderr, "    -format=authorized_keys       "+
-		"Format to print the public keys, valid formats are: fingerprint, "+""+
+	fmt.Fprintln(os.Stderr, "    -a authorized_keys")
+	fmt.Fprintln(os.Stderr, "    -algorithm=authorized_keys")
+	fmt.Fprintln(os.Stderr, "       Algorithm to hash the public keys, valid algorithms are: "+
 		"sha1, sha256, md5, authorized_keys")
-	fmt.Fprintln(os.Stderr, "    -output=console               Output format, valid formats are: console, json")
-	fmt.Fprintln(os.Stderr, "    -timeout=60s                  Connection timeout")
-	fmt.Fprintln(os.Stderr, "    -concurrent=4                 Concurrent workers")
-	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "    -e=")
+	fmt.Fprintln(os.Stderr, "    -encoding=")
+	fmt.Fprintln(os.Stderr, "       Encoding to encode the hashed keys, valid encodings are: "+
+		"hex, base32, base64 (only used for algorithms sha1, sha256 and md5)")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "    -o=console")
+	fmt.Fprintln(os.Stderr, "    -output=console")
+	fmt.Fprintln(os.Stderr, "       Output format, valid formats are: console, json")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "    -c=4")
+	fmt.Fprintln(os.Stderr, "    -concurrent=4")
+	fmt.Fprintln(os.Stderr, "       Concurrent workers")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "    -t=60s")
+	fmt.Fprintln(os.Stderr, "    -timeout=60s")
+	fmt.Fprintln(os.Stderr, "       Connection timeout")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "sshkeys %s %s %s https://github.com/Eun/sshkeys", version, commit, date)
 }
 
 func main() {
+	os.Exit(run())
+}
+func run() int {
 	setupFlags()
 	flag.Usage = printUsage
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
 		printUsage()
-		os.Exit(1)
+		return 1
 	}
 
 	host := strings.TrimSpace(args[0])
+	algorithm := parseAlgorithm(&algorithmOption)
 
-	format := parseFormat(formatOption)
+	var encoding sshkeys.Encoding
+	if algorithm != authorizedKeys {
+		encoding = parseEncoding(&encodingOption)
+	} else {
+		encodingOption = ""
+	}
+
 	output := parseOutput(outputOption)
 
 	timeout, err := time.ParseDuration(timeoutOption)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "'%s' is not a duration\n", timeoutOption)
-		os.Exit(1)
+		return 1
 	}
 
 	internalHost := host
 
 	if !govalidator.IsDialString(host) {
 		if !govalidator.IsHost(host) {
-			exitWithMessage(output, host, fmt.Sprintf("'%s' is not a valid hostname", host))
-			return
+			return exitWithMessage(output, host, fmt.Sprintf("'%s' is not a valid hostname", host))
 		}
 		internalHost = net.JoinHostPort(internalHost, "22")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	keys, err := sshkeys.GetKeys(ctx, internalHost, concurrentOption, sshkeys.DefaultKeyAlgorithms()...)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	keys, err := sshkeys.GetKeys(ctx, internalHost, concurrentOption, timeout, sshkeys.DefaultKeyAlgorithms()...)
 	cancel()
 	if err != nil {
-		exitWithMessage(output, host, err.Error())
-		return
+		return exitWithMessage(output, host, err.Error())
 	}
 
 	printableKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
-		printableKey, marshalErr := keyToString(key, format)
+		printableKey, marshalErr := keyToString(key, algorithm, encoding)
 		if marshalErr != nil {
-			exitWithMessage(output, host, marshalErr.Error())
-			return
+			return exitWithMessage(output, host, marshalErr.Error())
 		}
 		addToResult := true
 		for _, k := range printableKeys {
@@ -126,12 +155,23 @@ func main() {
 		return printableKeys[i] < printableKeys[j]
 	})
 
+	return exitWithSuccess(output, host, printableKeys)
+}
+
+func exitWithSuccess(output int, host string, printableKeys []string) int {
 	switch output {
 	case outputJSON:
-		err = json.NewEncoder(os.Stdout).Encode(struct {
+		err := json.NewEncoder(os.Stdout).Encode(struct {
 			Host       string
+			Algorithm  string
+			Encoding   string
 			PublicKeys []string
-		}{host, printableKeys})
+		}{
+			Host:       host,
+			Algorithm:  algorithmOption,
+			Encoding:   encodingOption,
+			PublicKeys: printableKeys,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to encode json: %+v", err)
 		}
@@ -140,51 +180,72 @@ func main() {
 			fmt.Println(printableKeys[i])
 		}
 	}
+	return 0
 }
 
-func exitWithMessage(output int, host, s string) {
+func exitWithMessage(output int, host, s string) int {
 	switch output {
 	case outputJSON:
 		err := json.NewEncoder(os.Stdout).Encode(struct {
 			Host  string
 			Error string
-		}{host, s})
+		}{
+			Host:  host,
+			Error: s,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to encode json: %+v", err)
 		}
 	default:
 		fmt.Fprintln(os.Stderr, s)
 	}
-	os.Exit(1)
+	return 1
 }
 
-func keyToString(key ssh.PublicKey, format int) (string, error) {
-	switch format {
+func keyToString(key ssh.PublicKey, algorithm fingerPrintAlgo, encoding sshkeys.Encoding) (string, error) {
+	switch algorithm {
 	case fingerprintMD5:
-		return sshkeys.FingerprintMD5(key)
+		return sshkeys.FingerprintMD5(encoding, key)
 	case fingerprintSHA1:
-		return sshkeys.FingerprintSHA1(key)
+		return sshkeys.FingerprintSHA1(encoding, key)
 	case fingerprintSHA256:
-		return sshkeys.FingerprintSHA256(key)
-	// case authorized_keys:
-	//	fallthrough
+		return sshkeys.FingerprintSHA256(encoding, key)
+	case authorizedKeys:
+		fallthrough //nolint:gocritic // allow fallthrough
 	default:
 		return sshkeys.AuthorizedKey(key)
 	}
 }
 
-func parseFormat(format string) int {
-	switch strings.ToLower(strings.TrimSpace(format)) {
+func parseAlgorithm(s *string) fingerPrintAlgo {
+	*s = strings.ToLower(strings.TrimSpace(*s))
+	switch *s {
 	case "md5":
 		return fingerprintMD5
 	case "sha1":
 		return fingerprintSHA1
 	case "sha256":
 		return fingerprintSHA256
-	// case "authorized_keys":
-	//	return authorizedKeys
+	case "authorized_keys":
+		fallthrough //nolint:gocritic // allow fallthrough
 	default:
+		*s = "authorized_keys"
 		return authorizedKeys
+	}
+}
+
+func parseEncoding(s *string) sshkeys.Encoding {
+	*s = strings.ToLower(strings.TrimSpace(*s))
+	switch *s {
+	case "base32":
+		return sshkeys.Base32Encoding
+	case "base64":
+		return sshkeys.Base64Encoding
+	case "hex":
+		fallthrough //nolint:gocritic // allow fallthrough
+	default:
+		*s = "hex"
+		return sshkeys.HexEncoding
 	}
 }
 

@@ -5,10 +5,13 @@ import (
 	"crypto/md5"  //nolint: gosec // allow weak cryptographic primitive
 	"crypto/sha1" //nolint: gosec // allow weak cryptographic primitive
 	"crypto/sha256"
+	"encoding/base32"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
@@ -43,7 +46,13 @@ func DefaultKeyAlgorithms() []string {
 // GetKeys gets the public keys for a host.
 // Specify the amount of concurrentWorkers and the algorithms that should be used to fetch the keys.
 // If unsure use DefaultKeyAlgorithms.
-func GetKeys(ctx context.Context, host string, concurrentWorkers int, algorithms ...string) (map[string]ssh.PublicKey, error) {
+func GetKeys(
+	ctx context.Context,
+	host string,
+	concurrentWorkers int,
+	timeout time.Duration,
+	algorithms ...string,
+) (map[string]ssh.PublicKey, error) {
 	if len(algorithms) == 0 {
 		algorithms = DefaultKeyAlgorithms()
 	}
@@ -63,7 +72,7 @@ func GetKeys(ctx context.Context, host string, concurrentWorkers int, algorithms
 	resultChan := make(chan workerResult, len(algorithms))
 
 	for i := 0; i < concurrentWorkers; i++ {
-		go worker(workerCtx, host, algoChan, resultChan)
+		go worker(workerCtx, host, timeout, algoChan, resultChan)
 	}
 
 	keys := make(map[string]ssh.PublicKey)
@@ -85,7 +94,9 @@ type workerResult struct {
 	err  error
 }
 
-func worker(ctx context.Context, host string, algoChan chan string, resultChan chan workerResult) {
+func worker(ctx context.Context, host string, timeout time.Duration, algoChan chan string, resultChan chan workerResult) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	for {
 		select {
 		case <-ctx.Done():
@@ -206,7 +217,8 @@ func GetVersion(ctx context.Context, host string) (string, error) {
 	}
 }
 
-func sumToString(sum []byte) string {
+// SumToHexString formats a sum in a aa:bb:cc:dd:ee:ff:... pattern.
+func SumToHexString(sum []byte) string {
 	var sb strings.Builder
 	for i := 0; i < len(sum); i++ {
 		fmt.Fprintf(&sb, "%02x", sum[i])
@@ -217,22 +229,43 @@ func sumToString(sum []byte) string {
 	return sb.String()
 }
 
+type Encoding uint8
+
+const (
+	HexEncoding Encoding = iota
+	Base32Encoding
+	Base64Encoding
+)
+
+func encodeFingerprint(encoding Encoding, sum []byte) (string, error) {
+	switch encoding {
+	case HexEncoding:
+		return SumToHexString(sum), nil
+	case Base32Encoding:
+		return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(sum), nil
+	case Base64Encoding:
+		return base64.RawStdEncoding.EncodeToString(sum), nil
+	default:
+		return "", errors.New("unknown encoding")
+	}
+}
+
 // FingerprintMD5 creates the md5 fingerprint of the provided public key.
-func FingerprintMD5(key ssh.PublicKey) (string, error) {
+func FingerprintMD5(encoding Encoding, key ssh.PublicKey) (string, error) {
 	sum := md5.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
-	return sumToString(sum[:]), nil
+	return encodeFingerprint(encoding, sum[:])
 }
 
 // FingerprintSHA1 creates the sha1 fingerprint of the provided public key.
-func FingerprintSHA1(key ssh.PublicKey) (string, error) {
+func FingerprintSHA1(encoding Encoding, key ssh.PublicKey) (string, error) {
 	sum := sha1.Sum(key.Marshal()) //nolint: gosec // allow weak cryptographic primitive
-	return sumToString(sum[:]), nil
+	return encodeFingerprint(encoding, sum[:])
 }
 
 // FingerprintSHA256 creates the sha256 fingerprint of the provided public key.
-func FingerprintSHA256(key ssh.PublicKey) (string, error) {
+func FingerprintSHA256(encoding Encoding, key ssh.PublicKey) (string, error) {
 	sum := sha256.Sum256(key.Marshal())
-	return sumToString(sum[:]), nil
+	return encodeFingerprint(encoding, sum[:])
 }
 
 // AuthorizedKey creates the authorized_key of the provided public key.

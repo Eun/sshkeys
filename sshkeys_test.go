@@ -80,7 +80,7 @@ func TestGetKeys(t *testing.T) {
 		}
 	}()
 
-	keys, err := sshkeys.GetKeys(context.Background(), l.Addr().String(), 4, sshkeys.DefaultKeyAlgorithms()...)
+	keys, err := sshkeys.GetKeys(context.Background(), l.Addr().String(), 4, time.Minute, sshkeys.DefaultKeyAlgorithms()...)
 	require.NoError(t, err)
 
 	fingerprints := make(map[string]string)

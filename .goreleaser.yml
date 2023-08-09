@@ -31,12 +31,6 @@ builds:
       - -X "main.description=${Description}"
 archives:
   - name_template: "${ProjectName}_{{.Version}}_{{.Os}}_{{.Arch}}{{if .Arm}}v{{.Arm}}{{end}}"
-    replacements:
-      darwin: "darwin"
-      linux: "linux"
-      windows: "windows"
-      386: "i386"
-      amd64: "x86_64"
     format_overrides:
       - goos: "windows"
         format: "zip"
@@ -50,13 +44,6 @@ nfpms:
   -
     id: "${ProjectName}"
     package_name: "${ProjectName}"
-
-    replacements:
-      amd64: "64-bit"
-      386: "32-bit"
-      darwin: "macOS"
-      linux: "linux"
-
     homepage: "${HomePage}"
     maintainer: "${Author} <${AuthorEmail}>"
     description: "A template for golang"

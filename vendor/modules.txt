@@ -10,7 +10,7 @@ github.com/davecgh/go-spew/spew
 # github.com/gliderlabs/ssh v0.3.6
 ## explicit; go 1.17
 github.com/gliderlabs/ssh
-# github.com/google/uuid v1.4.0
+# github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
 # github.com/pmezard/go-difflib v1.0.0

@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
-	github.com/gliderlabs/ssh v0.3.6
+	github.com/gliderlabs/ssh v0.3.7
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.20.0
